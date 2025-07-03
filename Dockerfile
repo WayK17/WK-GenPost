@@ -20,5 +20,5 @@ COPY ./bot ./bot
 # Copiamos el archivo de entrada
 COPY main.py .
 
-# Comando final para ejecutar el bot cuando se inicie el contenedor
-CMD ["python", "-m", "bot.main"]
+# Comando final corregido para ejecutar el bot
+CMD ["python", "main.py"]
