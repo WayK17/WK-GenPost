@@ -5,8 +5,9 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
-from .services import gemini, tmdb, mediainfo
-from . import templates
+# Cambiamos las importaciones
+from bot.services import gemini, tmdb, mediainfo
+from bot import templates
 
 logger = logging.getLogger(__name__)
 
