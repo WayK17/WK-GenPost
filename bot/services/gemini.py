@@ -2,7 +2,8 @@
 import logging
 import google.generativeai as genai
 import json
-from .. import config
+# Cambiamos la importación
+from bot import config
 
 logger = logging.getLogger(__name__)
 
