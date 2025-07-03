@@ -1,13 +1,10 @@
-# /bot/main.py
 import logging
-import asyncio
-
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
-# Importamos desde nuestros propios módulos
-from . import config
-from . import handlers
+# Cambiamos las importaciones para que sean absolutas desde 'bot'
+from bot import config
+from bot import handlers
 
 # Configura el logging para ver errores
 logging.basicConfig(
