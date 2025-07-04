@@ -158,7 +158,7 @@ async def file_handler(client: Client, message: Message):
         else:  # Episodio de serie
             season = details.get("season", 1)
             episode = details.get("episode")
-            tmdb_data = await tmdb.search_series(title, season, episode)
+            tmdb_data = await tmdb.search_series(title, season, episode_number=episode)
             template_to_use = templates.DEFAULT_TEMPLATE
             media_type_for_hashtag = "Serie"
         
@@ -179,8 +179,8 @@ async def file_handler(client: Client, message: Message):
         
         synopsis_url = await asyncio.to_thread(
             telegraph.create_page, 
-            title=f"Detalles de {tmdb_title}", 
-            content=telegraph_content
+            f"Detalles de {tmdb_title}", 
+            telegraph_content
         )
         
         # --- Fase 5: Ensamblaje de Datos Técnicos ---
