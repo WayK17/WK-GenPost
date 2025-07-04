@@ -33,33 +33,32 @@ def get_file_format(filename: str) -> str:
 
 def create_hashtags(media_type: str, genres: list, ai_genres: list = None) -> str:
     """
-    FUNCIÓN MEJORADA: Combina géneros de TMDb y IA para crear hashtags completos
+    FUNCIÓN MEJORADA: Crea hashtags en dos líneas separadas para mayor elegancia.
+    Línea 1: #Película o #Serie
+    Línea 2: #Genero1 #Genero2 #Genero3
     """
     type_hashtag = f"#{media_type.replace(' ', '')}"
     
-    # Combinamos géneros de TMDb con géneros de IA
+    # Combinamos géneros de TMDb con géneros de IA (backup)
     all_genres = []
-    
-    # Primero los géneros de TMDb (más precisos)
     if genres:
         all_genres.extend(genres)
-    
-    # Luego los géneros de IA como backup/complemento
-    if ai_genres and not genres:  # Solo si TMDb no tiene géneros
+    elif ai_genres:
         all_genres.extend(ai_genres)
-    
+        
     if not all_genres:
         return type_hashtag
-    
-    # Limpiamos y creamos hashtags de géneros
+
+    # Limpiamos y creamos hashtags de géneros (máximo 3)
     genre_hashtags = []
-    for genre in all_genres[:3]:  # Máximo 4 géneros
+    for genre in all_genres[:3]: # Tomamos solo los primeros 3 géneros
         if genre and isinstance(genre, str):
             clean_genre = genre.replace(' ', '').replace('-', '').replace('&', '').replace('/', '')
-            if clean_genre and len(clean_genre) > 2:  # Solo géneros válidos
+            if clean_genre and len(clean_genre) > 2:
                 genre_hashtags.append(f"#{clean_genre}")
     
-    return " ".join([type_hashtag] + genre_hashtags)
+    # Devolvemos el string con un salto de línea
+    return f"{type_hashtag}\n{' '.join(genre_hashtags)}"
 
 def format_runtime(minutes: Optional[int]) -> str:
     if not minutes: 
@@ -133,11 +132,11 @@ def merge_language_tracks(base_tracks: set, ai_tracks: list) -> str:
     return ", ".join(sorted(filtered_tracks)) if filtered_tracks else "N/D"
 
 # --- Función Principal de Procesamiento ---
-async def process_single_ai_request(filename: str, caption: Optional[str], media_info_data: Dict[str, Any]) -> Dict[str, Any]:
+async def process_single_ai_request(filename: str, caption: Optional[str], media_info_data: Dict[str, Any], tmdb_data_for_formatting: Dict[str, Any]) -> Dict[str, Any]:
     """
     Realiza UNA SOLA llamada a Gemini para obtener todos los datos necesarios.
     """
-    return await gemini.get_comprehensive_analysis(filename, caption, media_info_data)
+    return await gemini.get_comprehensive_analysis(filename, caption, media_info_data, tmdb_data_for_formatting)
 
 # --- Manejador Principal Optimizado ---
 @Client.on_message(filters.document | filters.video)
@@ -209,15 +208,13 @@ async def file_handler(client: Client, message: Message):
             await status_message.edit_text(f"❌ No encontré '{title}' en la base de datos.")
             return
         
-        # --- Fase 4: Creación del Informe Telegraph ---
-        await status_message.edit_text("📄 Creando informe detallado...")
-        
-        overview = tmdb_data.get('overview', 'Sinopsis no disponible.')
-        tmdb_title = tmdb_data.get('title') or tmdb_data.get('name')
-        
-        telegraph_content = (
-            f"<h3>Sinopsis Oficial</h3><p><em>{overview}</em></p><hr>"
-            f"<h3>Análisis del Experto (IA)</h3>{gemini_analysis}"
+        # --- Fase 4: UNA SOLA LLAMADA A LA IA (ahora con datos de TMDb) ---
+        await status_message.edit_text("🤖 Pidiendo a la IA que formatee la información con datos de TMDb...")
+        ai_comprehensive_data = await process_single_ai_request(
+            media.file_name, 
+            message.caption, 
+            media_info_data,
+            tmdb_data  # <--- ¡AQUÍ PASAMOS LOS DATOS!
         )
         
         synopsis_url = await asyncio.to_thread(

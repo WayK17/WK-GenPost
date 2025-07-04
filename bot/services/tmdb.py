@@ -70,11 +70,15 @@ async def search_movie(title: str, year: int | None) -> dict | None:
     if search_data and search_data.get("results"):
         best_match = find_best_match(title, search_data["results"])
         if best_match:
-            logger.info(f"Película encontrada: '{best_match['title']}' (ID: {best_match['id']})")
-            # Obtenemos detalles adicionales para tener la lista de géneros completa
-            details_data = await fetch_from_tmdb(f"{config.TMDB_API_URL}/movie/{best_match['id']}", {"api_key": config.TMDB_API_KEY, "language": "es-ES"})
+            movie_id = best_match['id']
+            logger.info(f"Película encontrada: '{best_match['title']}' (ID: {movie_id})")
+            
+            # Modificación: añadir "credits" para obtener actores y director
+            details_params = {"api_key": config.TMDB_API_KEY, "language": "es-ES", "append_to_response": "credits"}
+            details_data = await fetch_from_tmdb(f"{config.TMDB_API_URL}/movie/{movie_id}", details_params)
+            
             if details_data:
-                logger.info("Detalles y géneros de la película obtenidos correctamente.")
+                logger.info("Detalles, créditos y géneros de la película obtenidos.")
                 return details_data
     
     logger.warning(f"No se encontró la película '{title}' en TMDb.")
@@ -98,6 +102,10 @@ async def search_series(title: str, season_number: int | None, episode_number: i
         
     series_id = best_match['id']
     logger.info(f"Serie encontrada: '{best_match['name']}' (ID: {series_id})")
+
+    # Modificación: añadir "credits" para obtener actores y director de la serie
+    details_params = {"api_key": config.TMDB_API_KEY, "language": "es-ES", "append_to_response": "credits"}
+    series_details = await fetch_from_tmdb(f"{config.TMDB_API_URL}/tv/{series_id}", details_params)
 
     # 2. Si tenemos temporada y episodio, buscamos sus detalles. SI NO, devolvemos solo la serie.
     if season_number is not None and episode_number is not None:

@@ -28,7 +28,6 @@ async def get_comprehensive_analysis(filename: str, caption: str | None, media_i
     Actúa como un experto cinéfilo y crítico de medios. Analiza la información proporcionada y responde ESTRICTAMENTE con un objeto JSON.
     - Nombre del archivo: "{filename}"
     - Caption del usuario (si existe): "{caption if caption else 'No proporcionado.'}"
-    - Resumen Técnico (MediaInfo): "{tech_summary}"
 
     Tu respuesta DEBE ser un único objeto JSON válido, sin texto antes o después.
 
@@ -47,8 +46,7 @@ async def get_comprehensive_analysis(filename: str, caption: str | None, media_i
       "content_analysis": {{
         "probable_genres": ["Acción", "Drama", "Ciencia Ficción"],
         "content_type": "live_action" | "anime" | "documentary" | "animation"
-      }},
-      "telegraph_analysis": "Un análisis detallado y atractivo en formato HTML..."
+      }}
     }}
 
     INSTRUCCIONES DETALLADAS PARA CADA CAMPO:
@@ -61,15 +59,27 @@ async def get_comprehensive_analysis(filename: str, caption: str | None, media_i
     2.  **language_details**:
         * Prioriza el `Caption`. Si no existe, infiere del nombre del archivo (ej. "Latino", "Cast", "Subs"). Si no hay nada, usa `[]`.
 
-    3.  **telegraph_analysis**:
-        * Este es el campo más importante. Debe ser un string HTML.
-        * Estructura la respuesta usando estas secciones, en este orden:
-            * `<h3>🎬 Sinopsis</h3><p>...</p>`: Escribe una sinopsis atractiva y detallada.
-            * `<h3>🌍 Detalles de Producción</h3><p><b>País:</b> ...<br><b>Año de lanzamiento:</b> ...<br><b>Estudio:</b> ...</p>`: Investiga y completa estos datos.
-            * `<h3>🎭 Elenco Principal</h3><p><b>Actor 1</b> como Personaje 1<br><b>Actor 2</b> como Personaje 2</p>`: Menciona a los actores más importantes.
-            * `<h3>💡 Curiosidades y Comentarios</h3><p>...</p>`: Añade datos interesantes, trivia o comentarios sobre la recepción de la obra.
-            * `<h3>💻 Análisis Técnico del Archivo</h3><p>...</p>`: Usa el "Resumen Técnico" para crear un párrafo amigable sobre la calidad del video y audio.
-        * **IMPORTANTE**: Si no encuentras información para una sección (ej. curiosidades), omite esa sección completa (incluyendo el `<h3>`). Sé creativo y profesional.
+    **Resumen Técnico del Archivo:**
+    "{tech_summary}"
+
+    **Instrucciones de Formato HTML para el campo "telegraph_analysis":**
+    1.  Crea una sección `<h3>Sinopsis Oficial</h3>` y pon el valor de `overview` de TMDb dentro de una etiqueta `<p>`.
+    2.  Crea una sección `<h3>Detalles</h3>`. Dentro, crea una lista de datos con `<b>` para las etiquetas:
+        * Título Original: `original_title` o `original_name`
+        * Fecha de Estreno: `release_date` o `first_air_date`
+        * Géneros: Concatena los nombres de los `genres`.
+        * Duración: `runtime` (si existe, formatea como "Xh Ym").
+        * Director: Busca en `credits.crew` la persona con `job: 'Director'`.
+    3.  Crea una sección `<h3>Elenco Principal</h3>` y lista los 5 actores (`cast`) más importantes del apartado `credits`.
+    4.  Crea una sección `<h3>Análisis Técnico del Archivo</h3>` y usa el "Resumen Técnico" para describirlo brevemente NO COMO ROBOT, QUE SEA COMO UN MEDIAINFO CORTO.
+
+    **Responde ESTRICTAMENTE con un objeto JSON con esta estructura:**
+    {{
+      "details": {{ ... }}, // Rellena esto como antes, analizando el filename
+      "language_details": {{ ... }}, // Rellena esto como antes
+      "content_analysis": {{ ... }}, // Rellena esto como antes
+      "telegraph_analysis": "El string HTML que has formateado siguiendo las instrucciones."
+    }}
     """
     
     logger.info(f"Enviando petición maestra (V2) a Gemini para: {filename}")
