@@ -142,7 +142,7 @@ async def process_single_ai_request(filename: str, caption: Optional[str], media
 @Client.on_message(filters.document | filters.video)
 async def file_handler(client: Client, message: Message):
     """
-    Manejador principal con flujo de datos optimizado y corregido.
+    Manejador principal con el flujo de datos ORIGINAL y corregido.
     """
     media = message.video or message.document
     if not getattr(media, "file_name", None):
@@ -151,29 +151,32 @@ async def file_handler(client: Client, message: Message):
     status_message = await message.reply_text("⏳ Misión aceptada. Protocolos iniciados...", quote=True)
 
     try:
-        # --- Fase 1: Recolección de Datos Técnicos y Análisis Inicial ---
-        await status_message.edit_text("⚙️ Analizando metadatos del archivo...")
-        
-        # Obtenemos info de MediaInfo y de la IA (solo para el nombre) en paralelo
-        media_info_task = asyncio.create_task(mediainfo.get_media_info(client, message))
-        initial_ai_details_task = asyncio.create_task(gemini.get_initial_details(media.file_name))
-        
-        media_info_data = await media_info_task
-        initial_ai_details = await initial_ai_details_task
+        # --- Fase 1: Recolección de Datos Técnicos ---
+        await status_message.edit_text("⚙️ Obteniendo datos técnicos del archivo...")
+        media_info_data = await mediainfo.get_media_info(client, message)
 
-        if not initial_ai_details:
-            await status_message.edit_text("❌ La IA no pudo analizar el nombre del archivo.")
+        # --- Fase 2: LLAMADA ÚNICA A LA IA ---
+        await status_message.edit_text("🤖 Consultando a la IA (petición única)...")
+        ai_comprehensive_data = await gemini.get_comprehensive_analysis(
+            media.file_name,
+            message.caption,
+            media_info_data
+        )
+
+        if not ai_comprehensive_data or not ai_comprehensive_data.get("details"):
+            await status_message.edit_text("❌ La IA no pudo procesar la información del archivo.")
             return
-
-        # --- Fase 2: Búsqueda en TMDb ---
-        await status_message.edit_text("🎬 Buscando en la base de datos cinematográfica...")
         
-        title = initial_ai_details.get("title")
-        year = initial_ai_details.get("year")
-        media_type = initial_ai_details.get("type")
-        season = initial_ai_details.get("season")
-        episode = initial_ai_details.get("episode")
-
+        # Extraer detalles para la búsqueda
+        details_from_ai = ai_comprehensive_data.get("details", {})
+        title = details_from_ai.get("title")
+        year = details_from_ai.get("year")
+        media_type = details_from_ai.get("type")
+        season = details_from_ai.get("season")
+        episode = details_from_ai.get("episode")
+        
+        # --- Fase 3: Búsqueda en TMDb ---
+        await status_message.edit_text(f"🎬 Buscando '{title}' en la base de datos...")
         tmdb_data = None
         if media_type == "movie":
             tmdb_data = await tmdb.search_movie(title, year)
@@ -183,46 +186,50 @@ async def file_handler(client: Client, message: Message):
         if not tmdb_data:
             await status_message.edit_text(f"❌ No encontré '{title}' en la base de datos de TMDb.")
             return
-            
-        # --- Fase 3: Llamada a la IA para Formateo ---
-        await status_message.edit_text("🤖 Pidiendo a la IA que formatee la información...")
-        ai_comprehensive_data = await process_single_ai_request(
-            media.file_name,
-            message.caption,
-            media_info_data,
-            tmdb_data  # Pasamos los datos de TMDb para que la IA los formatee
-        )
 
-        if not ai_comprehensive_data:
-            await status_message.edit_text("❌ La IA no pudo procesar los datos para el post.")
-            return
+        # --- Fase 4: Creación de Contenido y Ensamblaje ---
+        await status_message.edit_text("📄 Creando informe detallado...")
 
-        # --- Fase 4: Ensamblaje Final de Datos ---
-        await status_message.edit_text("🔧 Ensamblando publicación final...")
-
-        # Extraer datos de las respuestas
-        details = ai_comprehensive_data.get("details", {})
-        lang_details_from_ai = ai_comprehensive_data.get("language_details", {})
-        content_analysis = ai_comprehensive_data.get("content_analysis", {})
-        gemini_analysis_html = ai_comprehensive_data.get("telegraph_analysis", "<p>Análisis de IA no disponible.</p>")
-
-        # Crear contenido para Telegraph
+        # Crear contenido para Telegraph usando los datos oficiales de TMDb
         tmdb_title = tmdb_data.get('title') or tmdb_data.get('name')
         overview = tmdb_data.get('overview', 'Sinopsis no disponible.')
-        telegraph_content = f"<h3>Sinopsis Oficial</h3><p><em>{overview}</em></p><hr>{gemini_analysis_html}"
+        
+        # Construir HTML para Telegraph con datos de TMDb
+        telegraph_content_parts = [f"<h3>Sinopsis Oficial</h3><p><em>{overview}</em></p>"]
+        
+        # Añadir detalles del elenco y director si existen en tmdb_data
+        credits = tmdb_data.get('credits', {})
+        cast = credits.get('cast', [])
+        crew = credits.get('crew', [])
+        if cast:
+            actor_list = "".join([f"<li><b>{actor['name']}</b> como {actor['character']}</li>" for actor in cast[:5]])
+            telegraph_content_parts.append(f"<h3>Elenco Principal</h3><ul>{actor_list}</ul>")
+        
+        director = next((person['name'] for person in crew if person.get('job') == 'Director'), None)
+        if director:
+             telegraph_content_parts.append(f"<p><b>Director:</b> {director}</p>")
+
+        telegraph_content = "".join(telegraph_content_parts)
         
         synopsis_url = await asyncio.to_thread(
             telegraph.create_page,
             f"Detalles de {tmdb_title}",
             telegraph_content
         )
-
-        # Preparar datos para la plantilla del post
+        
+        # --- Fase 5: Preparar datos finales para la plantilla ---
+        # Extraer el resto de datos de la IA
+        lang_details_from_ai = ai_comprehensive_data.get("language_details", {})
+        content_analysis_from_ai = ai_comprehensive_data.get("content_analysis", {})
+        
+        # Preparar datos
         base_audios, base_subs, resolution = extract_media_tracks(media_info_data)
         media_type_for_hashtag = "Película" if media_type == "movie" else "Serie"
+        
+        # Usar géneros de TMDb como fuente principal, y los de la IA como respaldo
         tmdb_genres_list = [genre['name'] for genre in tmdb_data.get('genres', [])]
-        ai_genres_list = content_analysis.get("probable_genres", [])
-
+        ai_genres_list = content_analysis_from_ai.get("probable_genres", [])
+        
         post_data = {
             "title": tmdb_title,
             "year": (tmdb_data.get('release_date') or tmdb_data.get('first_air_date', 'N/A')).split('-')[0],
@@ -239,7 +246,7 @@ async def file_handler(client: Client, message: Message):
             "subtitle_tracks": merge_language_tracks(base_subs, lang_details_from_ai.get("subtitles", []))
         }
 
-        # --- Fase 5: Publicación Final ---
+        # --- Fase 6: Publicación Final ---
         await status_message.edit_text("🚀 Publicando contenido...")
         
         is_season_pack = (message.caption and ("temporada" in message.caption.lower() or "season" in message.caption.lower()))
@@ -259,5 +266,10 @@ async def file_handler(client: Client, message: Message):
         logger.error(f"Error catastrófico en file_handler: {e}", exc_info=True)
         await status_message.edit_text(f"💥 ¡Uy! Hubo un error inesperado:\n`{e}`")
     finally:
-        # Limpieza (si es necesario)
-        pass
+        # Limpieza de archivos temporales
+        if media_info_data and "temp_file_path" in media_info_data:
+            try:
+                os.remove(media_info_data["temp_file_path"])
+                logger.info(f"Archivo temporal eliminado: {media_info_data['temp_file_path']}")
+            except OSError as e:
+                logger.error(f"Error al eliminar archivo temporal: {e}")
