@@ -148,7 +148,18 @@ async def file_handler(client: Client, message: Message):
     if not getattr(media, "file_name", None):
         return
 
+    # CRÍTICO: Almacenar el ID del mensaje original INMEDIATAMENTE
+    original_message_id = message.id
+    original_chat_id = message.chat.id
+    
+    # Debug logging
+    logger.info(f"[DEBUG] Mensaje original ID: {original_message_id}")
+    logger.info(f"[DEBUG] Chat ID: {original_chat_id}")
+    
     status_message = await message.reply_text("⏳ Misión aceptada. Protocolos iniciados...", quote=True)
+    
+    # Verificar que el status_message no interfiera
+    logger.info(f"[DEBUG] Status message ID: {status_message.id}")
 
     try:
         # --- Fase 1: Recolección de Datos Técnicos ---
@@ -181,7 +192,7 @@ async def file_handler(client: Client, message: Message):
         if media_type == "movie":
             tmdb_data = await tmdb.search_movie(title, year)
         elif media_type == "series":
-            tmdb_data = await tmdb.search_series(title, season, episode)
+            tmdb_data = await tmdb.search_series(title, year, season, episode)
 
         if not tmdb_data:
             await status_message.edit_text(f"❌ No encontré '{title}' en la base de datos de TMDb.")

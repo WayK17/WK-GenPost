@@ -99,12 +99,17 @@ async def search_movie(title: str, year: int | None) -> dict | None:
     logger.warning(f"No se encontró la película '{title}' en TMDb ni en español ni en inglés.")
     return None
 
-async def search_series(title: str, season_number: int | None, episode_number: int | None) -> dict | None:
-    """Busca una serie en TMDb, con fallback a inglés."""
-    logger.info(f"Buscando SERIE en TMDb: Título='{title}', S={season_number}, E={episode_number}")
+async def search_series(title: str, year: int | None, season_number: int | None, episode_number: int | None) -> dict | None:
+    """Busca una serie en TMDb, usando el año para precisión, con fallback a inglés."""
+    logger.info(f"Buscando SERIE en TMDb: Título='{title}', Año='{year}', S={season_number}, E={episode_number}")
     
     # --- Paso 1: Intentar en Español ---
-    search_params_es = {"api_key": config.TMDB_API_KEY, "query": title, "language": "es-ES"}
+    search_params_es = {
+        "api_key": config.TMDB_API_KEY,
+        "query": title,
+        "language": "es-ES",
+        "first_air_date_year": year if year else "" # <-- La clave del éxito
+    }
     search_data_es = await fetch_from_tmdb(f"{config.TMDB_API_URL}/search/tv", search_params_es)
     
     best_match_es = find_best_match(title, search_data_es.get("results", [])) if search_data_es else None
@@ -116,7 +121,12 @@ async def search_series(title: str, season_number: int | None, episode_number: i
         logger.info(f"Serie encontrada en español: '{best_match_es['name']}' (ID: {series_id})")
     else:
         logger.info(f"No se encontró un buen resultado en español para '{title}', intentando en inglés...")
-        search_params_en = {"api_key": config.TMDB_API_KEY, "query": title, "language": "en-US"}
+        search_params_en = {
+            "api_key": config.TMDB_API_KEY,
+            "query": title,
+            "language": "en-US",
+            "first_air_date_year": year if year else ""
+        }
         search_data_en = await fetch_from_tmdb(f"{config.TMDB_API_URL}/search/tv", search_params_en)
         best_match_en = find_best_match(title, search_data_en.get("results", [])) if search_data_en else None
         if best_match_en:
