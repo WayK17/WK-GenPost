@@ -1,5 +1,6 @@
-python-telegram-bot
+pyrogram
+tgcrypto
 python-dotenv
 pymediainfo
-aiohttp
 google-generativeai
+aiohttp

@@ -1,20 +1,18 @@
 # /bot/templates.py
 
 DEFAULT_TEMPLATE = """
-✨ **{title}** ({year}) ✨
+✨ <b>{title}</b> ({year})
 
 {gemini_description}
-
 ---
-🎬 **Detalles:**
-- **Sinopsis:** _{overview}_
-- **Géneros:** {genres}
+🎬 <b>Detalles:</b>
+<i>{overview}</i>
 
-⚙️ **Info. Técnica:**
-- **Resolución:** {resolution}
-- **Audio:** {audio_tracks}
-- **Subtítulos:** {subtitle_tracks}
-- **Peso:** {file_size}
+- <b>Géneros:</b> {genres}
+---
+⚙️ <b>Info. Técnica:</b>
+- <b>Resolución:</b> <code>{resolution}</code>
+- <b>Audio:</b> <code>{audio_tracks}</code>
+- <b>Subtítulos:</b> <code>{subtitle_tracks}</code>
+- <b>Peso:</b> <code>{file_size}</code>
 """
-
-# Aquí podríamos añadir TEMPLATE_2, TEMPLATE_3, etc. en el futuro.
