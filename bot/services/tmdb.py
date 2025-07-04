@@ -65,20 +65,23 @@ async def search_series(title: str, season: int, episode: int) -> dict | None:
                     return None
                 
                 series_id = tv_data["results"][0]["id"]
-                logger.info(f"Serie encontrada con ID: {series_id}. Buscando episodio...")
+            # --- LÓGICA MODIFICADA ---
+        if episode_number:
+            # Si nos dan un episodio, buscamos ese episodio
+            logger.info(f"Serie encontrada con ID: {series_id}. Buscando episodio {episode_number}...")
+            api_endpoint_url = f"{BASE_URL}/tv/{series_id}/season/{season}/episode/{episode_number}"
+        else:
+            # Si no hay episodio, buscamos los detalles de la temporada completa
+            logger.info(f"Serie encontrada con ID: {series_id}. Buscando detalles de la temporada {season}...")
+            api_endpoint_url = f"{BASE_URL}/tv/{series_id}/season/{season}"
 
-            # Paso 2: Usar el ID para buscar el episodio específico
-            episode_url = f"{BASE_URL}/tv/{series_id}/season/{season}/episode/{episode}"
-            episode_params = {
-                'api_key': config.TMDB_API_KEY,
-                'language': 'es-ES'
-            }
-            
-            async with session.get(episode_url, params=episode_params) as response:
-                response.raise_for_status()
-                episode_data = await response.json()
-                logger.info("Episodio encontrado.")
-                return episode_data
+        episode_params = {'api_key': config.TMDB_API_KEY, 'language': 'es-ES'}
+
+        async with session.get(api_endpoint_url, params=episode_params) as response:
+            response.raise_for_status()
+            data = await response.json()
+            logger.info("Datos de la temporada/episodio encontrados.")
+            return data
 
     except Exception as e:
         logger.error(f"Error al buscar episodio de serie en TMDb: {e}")

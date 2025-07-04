@@ -47,6 +47,38 @@ async def extract_media_details(filename: str) -> dict | None:
         logger.error(f"Error al conectar o analizar la respuesta de Gemini: {e}")
         return None
 
+
+async def extract_season_details_from_caption(caption: str) -> dict | None:
+    """
+    Usa Gemini para analizar el caption y extraer los detalles de una temporada completa.
+    """
+    prompt = f"""
+    Analiza el siguiente texto de un caption: "{caption}"
+
+    Extrae la siguiente información:
+    1. "title": el título principal de la serie.
+    2. "season": el número de la temporada.
+
+    Responde únicamente con un objeto JSON válido.
+
+    Ejemplos:
+    - Para "The Boys Temporada 4 Completa", la respuesta debe ser:
+      {{"title": "The Boys", "season": 4}}
+    - Para "Temporada completa de Bleach, la 2", la respuesta debe ser:
+      {{"title": "Bleach", "season": 2}}
+    """
+    logger.info(f"Enviando caption a Gemini para análisis de temporada: {caption}")
+    try:
+        response = await model.generate_content_async(prompt)
+        cleaned_response = response.text.strip().replace("```json", "").replace("```", "").strip()
+        details = json.loads(cleaned_response)
+        logger.info(f"Detalles de temporada extraídos por Gemini: {details}")
+        return details
+    except Exception as e:
+        logger.error(f"Error al analizar el caption de temporada con Gemini: {e}")
+        return None
+
+
 # Por ahora no necesitamos la función de descripción, la añadiremos luego.
 async def generate_creative_description(title: str, overview: str) -> str:
     """
