@@ -239,17 +239,17 @@ async def file_handler(client: Client, message: Message):
             "hashtags": create_hashtags(media_type_for_hashtag, tmdb_genres_list, ai_genres_list),
             "synopsis_url": synopsis_url or TELEGRAPH_FALLBACK_URL,
             "runtime": format_runtime(tmdb_data.get('runtime')),
-            "quality": "BDRip",
+            "quality": "WEB-DL",
             "file_size": format_file_size(media.file_size),
             "format": get_file_format(media.file_name),
-            "season": season,
-            "episode": episode,
             "resolution": resolution,
             "audio_tracks": merge_language_tracks(base_audios, lang_details_from_ai.get("audio", [])),
             "subtitle_tracks": merge_language_tracks(base_subs, lang_details_from_ai.get("subtitles", [])),
-            "series_title": title,
-            "season": season,
-            "episode": episode,
+            
+            # --- LLAVES AÑADIDAS PARA EVITAR ERRORES ---
+            "series_title": title,  # Título general de la serie
+            "season": season if season is not None else 0, # Default a 0 si es None
+            "episode": episode if episode is not None else 0, # Default a 0 si es None
             "episode_title": tmdb_title if media_type == 'series' and episode is not None else '',
             "episodes_count": episodes_count
         }
@@ -271,14 +271,14 @@ async def file_handler(client: Client, message: Message):
                 photo=poster_url,
                 caption=final_caption,
                 parse_mode=ParseMode.HTML,
-                reply_to_message_id=message.id  # <-- LA LÍNEA MÁGICA
+                reply_to_message_id=message.id  # <-- ESTA LÍNEA ES CRUCIAL
             )
         else:
             await client.send_message(
                 chat_id=message.chat.id,
                 text=final_caption,
                 parse_mode=ParseMode.HTML,
-                reply_to_message_id=message.id, # <-- LA LÍNEA MÁGICA
+                reply_to_message_id=message.id, # <-- Y ESTA TAMBIÉN
                 disable_web_page_preview=True
             )
 

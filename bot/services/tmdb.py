@@ -32,7 +32,7 @@ def find_best_match(query: str, results: list) -> dict | None:
                 best_match = result
     
     # Solo acepta el resultado si la similitud es razonable (evita falsos positivos)
-    if highest_ratio > 0.75: # Umbral de confianza del 60%
+    if highest_ratio > 0.7: # Umbral de confianza del 60%
         return best_match
     
     logger.warning(f"No se encontró un resultado suficientemente bueno para '{query}'. El mejor tuvo un ratio de {highest_ratio:.2f}.")
@@ -55,53 +55,77 @@ async def fetch_from_tmdb(url: str, params: dict) -> dict | None:
 # --- FUNCIONES PRINCIPALES ---
 
 async def search_movie(title: str, year: int | None) -> dict | None:
-    """Busca una película en TMDb con búsqueda inteligente."""
+    """Busca una película en TMDb, con fallback a inglés si no la encuentra en español."""
     logger.info(f"Buscando PELÍCULA en TMDb: Título='{title}', Año='{year}'")
     
-    search_params = {
+    # --- Paso 1: Intentar en Español ---
+    search_params_es = {
         "api_key": config.TMDB_API_KEY,
         "query": title,
         "language": "es-ES",
         "primary_release_year": year if year else ''
     }
+    search_data_es = await fetch_from_tmdb(f"{config.TMDB_API_URL}/search/movie", search_params_es)
     
-    search_data = await fetch_from_tmdb(f"{config.TMDB_API_URL}/search/movie", search_params)
-    
-    if search_data and search_data.get("results"):
-        best_match = find_best_match(title, search_data["results"])
+    if search_data_es and search_data_es.get("results"):
+        best_match = find_best_match(title, search_data_es["results"])
         if best_match:
+            # Si encontramos un buen resultado en español, lo usamos
             movie_id = best_match['id']
-            logger.info(f"Película encontrada: '{best_match['title']}' (ID: {movie_id})")
-            
-            # Modificación: añadir "credits" para obtener actores y director
+            logger.info(f"Película encontrada en español: '{best_match['title']}' (ID: {movie_id})")
             details_params = {"api_key": config.TMDB_API_KEY, "language": "es-ES", "append_to_response": "credits"}
-            details_data = await fetch_from_tmdb(f"{config.TMDB_API_URL}/movie/{movie_id}", details_params)
-            
-            if details_data:
-                logger.info("Detalles, créditos y géneros de la película obtenidos.")
-                return details_data
-    
-    logger.warning(f"No se encontró la película '{title}' en TMDb.")
+            return await fetch_from_tmdb(f"{config.TMDB_API_URL}/movie/{movie_id}", details_params)
+
+    # --- Paso 2: Fallback a Inglés si en español no hubo éxito ---
+    logger.info(f"No se encontró un buen resultado en español para '{title}', intentando en inglés...")
+    search_params_en = {
+        "api_key": config.TMDB_API_KEY,
+        "query": title,
+        "language": "en-US",
+        "primary_release_year": year if year else ''
+    }
+    search_data_en = await fetch_from_tmdb(f"{config.TMDB_API_URL}/search/movie", search_params_en)
+
+    if search_data_en and search_data_en.get("results"):
+        best_match = find_best_match(title, search_data_en["results"])
+        if best_match:
+            # Si encontramos un buen resultado en inglés, lo usamos
+            movie_id = best_match['id']
+            logger.info(f"Película encontrada en INGLÉS: '{best_match['title']}' (ID: {movie_id})")
+            # Pedimos los detalles en español para tener la sinopsis traducida si existe
+            details_params = {"api_key": config.TMDB_API_KEY, "language": "es-ES", "append_to_response": "credits"}
+            return await fetch_from_tmdb(f"{config.TMDB_API_URL}/movie/{movie_id}", details_params)
+
+    logger.warning(f"No se encontró la película '{title}' en TMDb ni en español ni en inglés.")
     return None
 
 async def search_series(title: str, season_number: int | None, episode_number: int | None) -> dict | None:
-    """Busca una serie y opcionalmente un episodio específico con búsqueda inteligente."""
+    """Busca una serie en TMDb, con fallback a inglés."""
     logger.info(f"Buscando SERIE en TMDb: Título='{title}', S={season_number}, E={episode_number}")
     
-    # 1. Buscar la serie
-    search_params = {"api_key": config.TMDB_API_KEY, "query": title, "language": "es-ES"}
-    search_data = await fetch_from_tmdb(f"{config.TMDB_API_URL}/search/tv", search_params)
+    # --- Paso 1: Intentar en Español ---
+    search_params_es = {"api_key": config.TMDB_API_KEY, "query": title, "language": "es-ES"}
+    search_data_es = await fetch_from_tmdb(f"{config.TMDB_API_URL}/search/tv", search_params_es)
+    
+    best_match_es = find_best_match(title, search_data_es.get("results", [])) if search_data_es else None
+    
+    # --- Paso 2: Fallback a Inglés ---
+    series_id = None
+    if best_match_es:
+        series_id = best_match_es['id']
+        logger.info(f"Serie encontrada en español: '{best_match_es['name']}' (ID: {series_id})")
+    else:
+        logger.info(f"No se encontró un buen resultado en español para '{title}', intentando en inglés...")
+        search_params_en = {"api_key": config.TMDB_API_KEY, "query": title, "language": "en-US"}
+        search_data_en = await fetch_from_tmdb(f"{config.TMDB_API_URL}/search/tv", search_params_en)
+        best_match_en = find_best_match(title, search_data_en.get("results", [])) if search_data_en else None
+        if best_match_en:
+            series_id = best_match_en['id']
+            logger.info(f"Serie encontrada en INGLÉS: '{best_match_en['name']}' (ID: {series_id})")
 
-    if not search_data or not search_data.get("results"):
-        logger.warning(f"No se encontró la serie '{title}' en TMDb.")
+    if not series_id:
+        logger.warning(f"No se encontró la serie '{title}' en TMDb ni en español ni en inglés.")
         return None
-
-    best_match = find_best_match(title, search_data["results"])
-    if not best_match:
-        return None
-        
-    series_id = best_match['id']
-    logger.info(f"Serie encontrada: '{best_match['name']}' (ID: {series_id})")
 
     # Modificación: añadir "credits" para obtener actores y director de la serie
     details_params = {"api_key": config.TMDB_API_KEY, "language": "es-ES", "append_to_response": "credits"}
