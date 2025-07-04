@@ -47,8 +47,6 @@ async def main():
     """Inicia el cliente de Pyrogram y el servidor web en paralelo."""
     logger.info("Iniciando la nave Fénix con todos sus sistemas...")
     
-    await telegraph.initialize_telegraph()
-    
     # Creamos el cliente de Pyrogram
     app = Client(
         "PostCreatorBot",
