@@ -79,6 +79,37 @@ async def extract_season_details_from_caption(caption: str) -> dict | None:
         return None
 
 
+async def extract_language_details_from_caption(caption: str) -> dict | None:
+    """
+    Usa Gemini para analizar el caption y extraer detalles de audio y subtítulos.
+    """
+    prompt = f"""
+    Analiza el siguiente texto de un caption: "{caption}"
+
+    Extrae la siguiente información sobre el audio y los subtítulos:
+    1. "audio": una lista de los idiomas del audio. Diferencia claramente entre "Latino" y "Castellano" o "Español".
+    2. "subtitles": una lista de los idiomas de los subtítulos. Identifica si son "Forzados".
+
+    Responde únicamente con un objeto JSON válido.
+
+    Ejemplos:
+    - Para "Audio latino e inglés con subs forzados", la respuesta debe ser:
+      {{"audio": ["Latino", "Inglés"], "subtitles": ["Español (Forzados)"]}}
+    - Para "Audio dual latino/inglés y subs completos", la respuesta debe ser:
+      {{"audio": ["Latino", "Inglés"], "subtitles": ["Español", "Inglés"]}}
+    """
+    logger.info(f"Analizando caption con Gemini para detalles de idioma: {caption}")
+    try:
+        response = await model.generate_content_async(prompt)
+        cleaned_response = response.text.strip().replace("```json", "").replace("```", "").strip()
+        details = json.loads(cleaned_response)
+        logger.info(f"Detalles de idioma extraídos por Gemini: {details}")
+        return details
+    except Exception as e:
+        logger.error(f"Error al analizar caption de idioma con Gemini: {e}")
+        return None
+
+
 # Por ahora no necesitamos la función de descripción, la añadiremos luego.
 async def generate_creative_description(title: str, overview: str) -> str:
     """
