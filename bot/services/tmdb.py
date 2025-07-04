@@ -32,7 +32,7 @@ def find_best_match(query: str, results: list) -> dict | None:
                 best_match = result
     
     # Solo acepta el resultado si la similitud es razonable (evita falsos positivos)
-    if highest_ratio > 0.6: # Umbral de confianza del 60%
+    if highest_ratio > 0.75: # Umbral de confianza del 60%
         return best_match
     
     logger.warning(f"No se encontró un resultado suficientemente bueno para '{query}'. El mejor tuvo un ratio de {highest_ratio:.2f}.")

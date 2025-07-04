@@ -228,7 +228,10 @@ async def file_handler(client: Client, message: Message):
         
         # Usar géneros de TMDb como fuente principal, y los de la IA como respaldo
         tmdb_genres_list = [genre['name'] for genre in tmdb_data.get('genres', [])]
-        ai_genres_list = content_analysis_from_ai.get("probable_genres", [])
+        ai_genres_list = content_analysis_from_ai.get("probable_genres", [])     
+
+        # Contamos los episodios si es una temporada y nos aseguramos de tener todas las llaves.
+        episodes_count = len(tmdb_data.get('episodes', [])) if media_type == 'series' else 0 
         
         post_data = {
             "title": tmdb_title,
@@ -236,14 +239,19 @@ async def file_handler(client: Client, message: Message):
             "hashtags": create_hashtags(media_type_for_hashtag, tmdb_genres_list, ai_genres_list),
             "synopsis_url": synopsis_url or TELEGRAPH_FALLBACK_URL,
             "runtime": format_runtime(tmdb_data.get('runtime')),
-            "quality": "WEB-DL",
+            "quality": "BDRip",
             "file_size": format_file_size(media.file_size),
             "format": get_file_format(media.file_name),
             "season": season,
             "episode": episode,
             "resolution": resolution,
             "audio_tracks": merge_language_tracks(base_audios, lang_details_from_ai.get("audio", [])),
-            "subtitle_tracks": merge_language_tracks(base_subs, lang_details_from_ai.get("subtitles", []))
+            "subtitle_tracks": merge_language_tracks(base_subs, lang_details_from_ai.get("subtitles", [])),
+            "series_title": title,
+            "season": season,
+            "episode": episode,
+            "episode_title": tmdb_title if media_type == 'series' and episode is not None else '',
+            "episodes_count": episodes_count
         }
 
         # --- Fase 6: Publicación Final ---
@@ -258,9 +266,21 @@ async def file_handler(client: Client, message: Message):
 
         await status_message.delete()
         if poster_url:
-            await client.send_photo(message.chat.id, photo=poster_url, caption=final_caption, parse_mode=ParseMode.HTML)
+            await client.send_photo(
+                chat_id=message.chat.id,
+                photo=poster_url,
+                caption=final_caption,
+                parse_mode=ParseMode.HTML,
+                reply_to_message_id=message.id  # <-- LA LÍNEA MÁGICA
+            )
         else:
-            await message.reply_text(final_caption, quote=True, parse_mode=ParseMode.HTML)
+            await client.send_message(
+                chat_id=message.chat.id,
+                text=final_caption,
+                parse_mode=ParseMode.HTML,
+                reply_to_message_id=message.id, # <-- LA LÍNEA MÁGICA
+                disable_web_page_preview=True
+            )
 
     except Exception as e:
         logger.error(f"Error catastrófico en file_handler: {e}", exc_info=True)
