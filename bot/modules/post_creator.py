@@ -31,20 +31,32 @@ TELEGRAPH_FALLBACK_URL = "https://telegra.ph/"
 def get_file_format(filename: str) -> str:
     return filename.split('.')[-1].upper() if '.' in filename else 'N/A'
 
-def create_hashtags(media_type: str, genres: list) -> str:
-    """FUNCIÓN CORREGIDA: Maneja géneros vacíos y crea hashtags válidos"""
+def create_hashtags(media_type: str, genres: list, ai_genres: list = None) -> str:
+    """
+    FUNCIÓN MEJORADA: Combina géneros de TMDb y IA para crear hashtags completos
+    """
     type_hashtag = f"#{media_type.replace(' ', '')}"
     
-    if not genres:
-        # Si no hay géneros, solo devolvemos el tipo
+    # Combinamos géneros de TMDb con géneros de IA
+    all_genres = []
+    
+    # Primero los géneros de TMDb (más precisos)
+    if genres:
+        all_genres.extend(genres)
+    
+    # Luego los géneros de IA como backup/complemento
+    if ai_genres and not genres:  # Solo si TMDb no tiene géneros
+        all_genres.extend(ai_genres)
+    
+    if not all_genres:
         return type_hashtag
     
     # Limpiamos y creamos hashtags de géneros
     genre_hashtags = []
-    for genre in genres:
+    for genre in all_genres[:4]:  # Máximo 4 géneros
         if genre and isinstance(genre, str):
             clean_genre = genre.replace(' ', '').replace('-', '').replace('&', '').replace('/', '')
-            if clean_genre:  # Solo agregar si no está vacío
+            if clean_genre and len(clean_genre) > 2:  # Solo géneros válidos
                 genre_hashtags.append(f"#{clean_genre}")
     
     return " ".join([type_hashtag] + genre_hashtags)
@@ -61,18 +73,15 @@ def format_file_size(size_bytes: Optional[int]) -> str:
     return f"{size_bytes / (1024*1024*1024):.2f} GB"
 
 def normalize_language(lang_input: str) -> str:
-    """FUNCIÓN NUEVA: Normaliza cualquier entrada de idioma a abreviación"""
+    """Normaliza cualquier entrada de idioma a abreviación"""
     if not lang_input or not isinstance(lang_input, str):
         return ""
     
-    # Limpiamos la entrada
     clean_lang = lang_input.lower().strip()
-    
-    # Buscamos en nuestro mapeo
     return LANG_MAP.get(clean_lang, clean_lang)
 
 def extract_media_tracks(media_info_data: Dict[str, Any]) -> tuple:
-    """FUNCIÓN CORREGIDA: Extrae solo idiomas, no títulos contaminados"""
+    """Extrae solo idiomas, no títulos contaminados"""
     base_audios, base_subs = set(), set()
     resolution = "N/A"
     
@@ -89,47 +98,36 @@ def extract_media_tracks(media_info_data: Dict[str, Any]) -> tuple:
         if width and height:
             resolution = f"{width}x{height}"
     
-    # CORRECCIÓN: Extraer pistas de audio SIN títulos contaminados
+    # Extraer pistas de audio
     for track in tracks:
         if track.get('@type') == 'Audio':
-            # ORDEN DE PRIORIDAD CORRECTO:
-            # 1. Language_String3 (ISO estándar como "spa", "eng")
-            # 2. Language (código de idioma)
-            # 3. Normalizar a abreviación
-            
             lang_candidate = (track.get('Language_String3') or 
                              track.get('Language') or 
                              track.get('Language_String2'))
             
             if lang_candidate:
                 normalized_lang = normalize_language(lang_candidate)
-                if normalized_lang and len(normalized_lang) <= 4:  # Evitar títulos largos
+                if normalized_lang and len(normalized_lang) <= 4:
                     base_audios.add(normalized_lang)
     
-    # CORRECCIÓN: Extraer pistas de subtítulos SIN títulos contaminados
+    # Extraer pistas de subtítulos
     for track in tracks:
         if track.get('@type') == 'Text':
-            # Misma lógica que audio
             lang_candidate = (track.get('Language_String3') or 
                              track.get('Language') or 
                              track.get('Language_String2'))
             
             if lang_candidate:
                 normalized_lang = normalize_language(lang_candidate)
-                if normalized_lang and len(normalized_lang) <= 4:  # Evitar títulos largos
+                if normalized_lang and len(normalized_lang) <= 4:
                     base_subs.add(normalized_lang)
     
     return base_audios, base_subs, resolution
 
 def merge_language_tracks(base_tracks: set, ai_tracks: list) -> str:
-    """FUNCIÓN CORREGIDA: Combina y normaliza todas las pistas"""
-    # Normalizamos las pistas de IA también
+    """Combina y normaliza todas las pistas"""
     normalized_ai_tracks = [normalize_language(track) for track in ai_tracks if track]
-    
-    # Combinamos todo
     all_tracks = base_tracks.union(set(normalized_ai_tracks))
-    
-    # Filtramos y ordenamos
     filtered_tracks = [track for track in all_tracks if track and len(track) <= 4]
     
     return ", ".join(sorted(filtered_tracks)) if filtered_tracks else "N/D"
@@ -138,7 +136,6 @@ def merge_language_tracks(base_tracks: set, ai_tracks: list) -> str:
 async def process_single_ai_request(filename: str, caption: Optional[str], media_info_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Realiza UNA SOLA llamada a Gemini para obtener todos los datos necesarios.
-    Esta es la optimización clave que tu abuelita identificó.
     """
     return await gemini.get_comprehensive_analysis(filename, caption, media_info_data)
 
@@ -146,8 +143,7 @@ async def process_single_ai_request(filename: str, caption: Optional[str], media
 @Client.on_message(filters.document | filters.video)
 async def file_handler(client: Client, message: Message):
     """
-    Manejador principal optimizado para hacer UNA SOLA llamada a la IA.
-    Elimina las múltiples llamadas separadas a Gemini.
+    Manejador principal MEJORADO con géneros de IA e iconos dinámicos.
     """
     media = message.video or message.document
     if not getattr(media, "file_name", None): 
@@ -159,20 +155,16 @@ async def file_handler(client: Client, message: Message):
         # --- Fase 1: Recolección de Datos Técnicos ---
         await status_message.edit_text("⚙️ Obteniendo datos técnicos del archivo...")
         
-        # Obtener MediaInfo en paralelo con la preparación de datos
         media_info_task = asyncio.create_task(mediainfo.get_media_info(client, message))
         
-        # Preparar contexto para la IA
         is_season_pack = (message.caption and 
                          ("temporada" in message.caption.lower() or "season" in message.caption.lower()))
         
-        # Esperar MediaInfo
         media_info_data = await media_info_task
         
-        # --- Fase 2: UNA SOLA LLAMADA A LA IA ---
-        await status_message.edit_text("🤖 Consultando a la IA (análisis completo)...")
+        # --- Fase 2: UNA SOLA LLAMADA A LA IA MEJORADA ---
+        await status_message.edit_text("🤖 Consultando a la IA (análisis completo con géneros)...")
         
-        # ¡OPTIMIZACIÓN CLAVE! Una sola llamada para todo
         ai_comprehensive_data = await process_single_ai_request(
             media.file_name, 
             message.caption, 
@@ -183,12 +175,13 @@ async def file_handler(client: Client, message: Message):
             await status_message.edit_text("❌ La IA no pudo procesar la información del archivo.")
             return
         
-        # Extraer todos los datos de la respuesta única
+        # Extraer TODOS los datos de la respuesta única
         details = ai_comprehensive_data.get("details", {})
         lang_details_from_ai = ai_comprehensive_data.get("language_details", {})
+        content_analysis = ai_comprehensive_data.get("content_analysis", {})  # NUEVO
         gemini_analysis = ai_comprehensive_data.get("telegraph_analysis", "<p>Análisis no disponible.</p>")
         
-        # --- Fase 3: Búsqueda en TMDb ---
+        # --- Fase 3: Búsqueda en TMDb MEJORADA ---
         await status_message.edit_text("🎬 Buscando en la base de datos cinematográfica...")
         
         media_type = details.get("type")
@@ -205,7 +198,7 @@ async def file_handler(client: Client, message: Message):
             tmdb_data = await tmdb.search_movie(title, year)
             template_to_use = templates.MOVIE_TEMPLATE
             media_type_for_hashtag = "Película"
-        else:  # Episodio de serie
+        else:
             season = details.get("season", 1)
             episode = details.get("episode")
             tmdb_data = await tmdb.search_series(title, season, episode_number=episode)
@@ -233,18 +226,18 @@ async def file_handler(client: Client, message: Message):
             telegraph_content
         )
         
-        # --- Fase 5: Ensamblaje de Datos Técnicos CORREGIDO ---
+        # --- Fase 5: Ensamblaje de Datos Técnicos ---
         await status_message.edit_text("🔧 Ensamblando información técnica...")
         
-        # Extraer pistas de MediaInfo (YA CORREGIDO)
         base_audios, base_subs, resolution = extract_media_tracks(media_info_data)
-        
-        # Combinar con datos de IA (YA CORREGIDO)
         final_audios = merge_language_tracks(base_audios, lang_details_from_ai.get("audio", []))
         final_subs = merge_language_tracks(base_subs, lang_details_from_ai.get("subtitles", []))
         
-        # --- Fase 6: Preparación de Datos del Post CORREGIDA ---
-        genres_list = [genre['name'] for genre in tmdb_data.get('genres', [])]
+        # --- Fase 6: Preparación MEJORADA con géneros e iconos ---
+        tmdb_genres_list = [genre['name'] for genre in tmdb_data.get('genres', [])]
+        ai_genres_list = content_analysis.get("probable_genres", [])
+        content_type = content_analysis.get("content_type", "live_action")
+        
         release_date = (tmdb_data.get('release_date') or 
                        tmdb_data.get('air_date') or 
                        tmdb_data.get('first_air_date', 'N/A'))
