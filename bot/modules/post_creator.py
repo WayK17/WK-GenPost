@@ -11,12 +11,19 @@ from bot import templates
 
 logger = logging.getLogger(__name__)
 
-# --- Constantes y Configuración ---
+# --- Constantes y Configuración CORREGIDAS ---
 LANG_MAP = {
-    "español": "esp", "ingles": "eng", "inglés": "eng", 
-    "latino": "lat", "japones": "jap", "japonés": "jap",
-    "spa": "Español", "eng": "Inglés", "lat": "Latino", "jap": "Japonés"
+    # Mapeo de idiomas completos a abreviaciones
+    "español": "esp", "spanish": "esp", "spa": "esp",
+    "ingles": "eng", "inglés": "eng", "english": "eng", "eng": "eng",
+    "latino": "lat", "latin": "lat", "lat": "lat",
+    "japones": "jap", "japonés": "jap", "japanese": "jap", "jap": "jap",
+    "frances": "fra", "francés": "fra", "french": "fra", "fra": "fra",
+    "aleman": "ger", "alemán": "ger", "german": "ger", "ger": "ger",
+    "italiano": "ita", "italian": "ita", "ita": "ita",
+    "portugues": "por", "português": "por", "portuguese": "por", "por": "por"
 }
+
 TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"
 TELEGRAPH_FALLBACK_URL = "https://telegra.ph/"
 
@@ -25,8 +32,21 @@ def get_file_format(filename: str) -> str:
     return filename.split('.')[-1].upper() if '.' in filename else 'N/A'
 
 def create_hashtags(media_type: str, genres: list) -> str:
+    """FUNCIÓN CORREGIDA: Maneja géneros vacíos y crea hashtags válidos"""
     type_hashtag = f"#{media_type.replace(' ', '')}"
-    genre_hashtags = [f"#{genre.replace(' ', '').replace('-', '')}" for genre in genres]
+    
+    if not genres:
+        # Si no hay géneros, solo devolvemos el tipo
+        return type_hashtag
+    
+    # Limpiamos y creamos hashtags de géneros
+    genre_hashtags = []
+    for genre in genres:
+        if genre and isinstance(genre, str):
+            clean_genre = genre.replace(' ', '').replace('-', '').replace('&', '').replace('/', '')
+            if clean_genre:  # Solo agregar si no está vacío
+                genre_hashtags.append(f"#{clean_genre}")
+    
     return " ".join([type_hashtag] + genre_hashtags)
 
 def format_runtime(minutes: Optional[int]) -> str:
@@ -40,8 +60,19 @@ def format_file_size(size_bytes: Optional[int]) -> str:
         return "N/A"
     return f"{size_bytes / (1024*1024*1024):.2f} GB"
 
+def normalize_language(lang_input: str) -> str:
+    """FUNCIÓN NUEVA: Normaliza cualquier entrada de idioma a abreviación"""
+    if not lang_input or not isinstance(lang_input, str):
+        return ""
+    
+    # Limpiamos la entrada
+    clean_lang = lang_input.lower().strip()
+    
+    # Buscamos en nuestro mapeo
+    return LANG_MAP.get(clean_lang, clean_lang)
+
 def extract_media_tracks(media_info_data: Dict[str, Any]) -> tuple:
-    """Extrae pistas de audio y subtítulos del MediaInfo."""
+    """FUNCIÓN CORREGIDA: Extrae solo idiomas, no títulos contaminados"""
     base_audios, base_subs = set(), set()
     resolution = "N/A"
     
@@ -58,30 +89,49 @@ def extract_media_tracks(media_info_data: Dict[str, Any]) -> tuple:
         if width and height:
             resolution = f"{width}x{height}"
     
-    # Extraer pistas de audio
+    # CORRECCIÓN: Extraer pistas de audio SIN títulos contaminados
     for track in tracks:
         if track.get('@type') == 'Audio':
-            title = (track.get('Title') or 
-                    LANG_MAP.get(track.get('Language', '').lower()) or 
-                    track.get('Language_String3'))
-            if title:
-                base_audios.add(title)
+            # ORDEN DE PRIORIDAD CORRECTO:
+            # 1. Language_String3 (ISO estándar como "spa", "eng")
+            # 2. Language (código de idioma)
+            # 3. Normalizar a abreviación
+            
+            lang_candidate = (track.get('Language_String3') or 
+                             track.get('Language') or 
+                             track.get('Language_String2'))
+            
+            if lang_candidate:
+                normalized_lang = normalize_language(lang_candidate)
+                if normalized_lang and len(normalized_lang) <= 4:  # Evitar títulos largos
+                    base_audios.add(normalized_lang)
     
-    # Extraer pistas de subtítulos
+    # CORRECCIÓN: Extraer pistas de subtítulos SIN títulos contaminados
     for track in tracks:
         if track.get('@type') == 'Text':
-            title = (track.get('Title') or 
-                    LANG_MAP.get(track.get('Language', '').lower()) or 
-                    track.get('Language_String3'))
-            if title:
-                base_subs.add(title)
+            # Misma lógica que audio
+            lang_candidate = (track.get('Language_String3') or 
+                             track.get('Language') or 
+                             track.get('Language_String2'))
+            
+            if lang_candidate:
+                normalized_lang = normalize_language(lang_candidate)
+                if normalized_lang and len(normalized_lang) <= 4:  # Evitar títulos largos
+                    base_subs.add(normalized_lang)
     
     return base_audios, base_subs, resolution
 
 def merge_language_tracks(base_tracks: set, ai_tracks: list) -> str:
-    """Combina pistas base con las detectadas por IA."""
-    base_tracks.update(ai_tracks)
-    filtered_tracks = list(filter(None, base_tracks))
+    """FUNCIÓN CORREGIDA: Combina y normaliza todas las pistas"""
+    # Normalizamos las pistas de IA también
+    normalized_ai_tracks = [normalize_language(track) for track in ai_tracks if track]
+    
+    # Combinamos todo
+    all_tracks = base_tracks.union(set(normalized_ai_tracks))
+    
+    # Filtramos y ordenamos
+    filtered_tracks = [track for track in all_tracks if track and len(track) <= 4]
+    
     return ", ".join(sorted(filtered_tracks)) if filtered_tracks else "N/D"
 
 # --- Función Principal de Procesamiento ---
@@ -183,17 +233,17 @@ async def file_handler(client: Client, message: Message):
             telegraph_content
         )
         
-        # --- Fase 5: Ensamblaje de Datos Técnicos ---
+        # --- Fase 5: Ensamblaje de Datos Técnicos CORREGIDO ---
         await status_message.edit_text("🔧 Ensamblando información técnica...")
         
-        # Extraer pistas de MediaInfo
+        # Extraer pistas de MediaInfo (YA CORREGIDO)
         base_audios, base_subs, resolution = extract_media_tracks(media_info_data)
         
-        # Combinar con datos de IA
+        # Combinar con datos de IA (YA CORREGIDO)
         final_audios = merge_language_tracks(base_audios, lang_details_from_ai.get("audio", []))
         final_subs = merge_language_tracks(base_subs, lang_details_from_ai.get("subtitles", []))
         
-        # --- Fase 6: Preparación de Datos del Post ---
+        # --- Fase 6: Preparación de Datos del Post CORREGIDA ---
         genres_list = [genre['name'] for genre in tmdb_data.get('genres', [])]
         release_date = (tmdb_data.get('release_date') or 
                        tmdb_data.get('air_date') or 
@@ -202,7 +252,7 @@ async def file_handler(client: Client, message: Message):
         post_data = {
             "title": tmdb_title,
             "year": release_date.split('-')[0] if release_date != 'N/A' else 'N/A',
-            "hashtags": create_hashtags(media_type_for_hashtag, genres_list),
+            "hashtags": create_hashtags(media_type_for_hashtag, genres_list),  # CORREGIDO
             "synopsis_url": synopsis_url or TELEGRAPH_FALLBACK_URL,
             "runtime": format_runtime(tmdb_data.get('runtime')),
             "quality": "WEB-DL",
@@ -213,8 +263,8 @@ async def file_handler(client: Client, message: Message):
             "episodes_count": (len(tmdb_data.get('episodes', [])) if is_season_pack 
                              else tmdb_data.get('episode_number')),
             "resolution": resolution,
-            "audio_tracks": final_audios,
-            "subtitle_tracks": final_subs,
+            "audio_tracks": final_audios,  # CORREGIDO
+            "subtitle_tracks": final_subs,  # CORREGIDO
             "series_title": title,
             "episode_title": tmdb_title if media_type == 'series' else ''
         }
