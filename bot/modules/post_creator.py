@@ -245,7 +245,7 @@ async def file_handler(client: Client, message: Message):
         post_data = {
             "title": tmdb_title,
             "year": release_date.split('-')[0] if release_date != 'N/A' else 'N/A',
-            "hashtags": create_hashtags(media_type_for_hashtag, genres_list),  # CORREGIDO
+            "hashtags": create_hashtags(media_type_for_hashtag, tmdb_genres_list, ai_genres_list),
             "synopsis_url": synopsis_url or TELEGRAPH_FALLBACK_URL,
             "runtime": format_runtime(tmdb_data.get('runtime')),
             "quality": "WEB-DL",
