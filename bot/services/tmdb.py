@@ -31,8 +31,17 @@ async def search_movie(title: str, year: int | None = None) -> dict | None:
                 data = await response.json()
                 
                 if data.get("results"):
-                    logger.info("Película encontrada en TMDb.")
-                    return data["results"][0]
+                    movie_id = data["results"][0]["id"]
+                    
+                    # CORRECCIÓN: Obtener detalles completos de la película incluyendo géneros
+                    movie_details_url = f"{BASE_URL}/movie/{movie_id}"
+                    movie_params = {'api_key': config.TMDB_API_KEY, 'language': 'es-ES'}
+                    
+                    async with session.get(movie_details_url, params=movie_params) as details_response:
+                        details_response.raise_for_status()
+                        movie_details = await details_response.json()
+                        logger.info("Película encontrada en TMDb con géneros.")
+                        return movie_details
                 else:
                     logger.warning("No se encontraron resultados para la película.")
                     return None
@@ -67,6 +76,14 @@ async def search_series(title: str, season: int, episode_number: int = None) -> 
                 
                 series_id = tv_data["results"][0]["id"]
                 
+                # CORRECCIÓN: Primero obtenemos detalles completos de la serie para géneros
+                series_details_url = f"{BASE_URL}/tv/{series_id}"
+                series_params = {'api_key': config.TMDB_API_KEY, 'language': 'es-ES'}
+                
+                async with session.get(series_details_url, params=series_params) as series_response:
+                    series_response.raise_for_status()
+                    series_data = await series_response.json()
+                
                 # --- LÓGICA CORREGIDA ---
                 if episode_number:
                     # Si nos dan un episodio, buscamos ese episodio
@@ -81,11 +98,15 @@ async def search_series(title: str, season: int, episode_number: int = None) -> 
 
                 async with session.get(api_endpoint_url, params=episode_params) as response:
                     response.raise_for_status()
-                    data = await response.json()
-                    logger.info("Datos de la temporada/episodio encontrados.")
-                    return data
+                    episode_data = await response.json()
+                    
+                    # CORRECCIÓN: Combinamos los datos del episodio/temporada con los géneros de la serie
+                    episode_data['genres'] = series_data.get('genres', [])
+                    episode_data['series_genres'] = series_data.get('genres', [])  # Backup
+                    
+                    logger.info("Datos de la temporada/episodio encontrados con géneros.")
+                    return episode_data
 
     except Exception as e:
         logger.error(f"Error al buscar episodio de serie en TMDb: {e}")
         return None
-        
