@@ -5,3 +5,4 @@ pymediainfo
 google-generativeai
 aiohttp
 telegraph
+httpx
