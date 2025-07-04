@@ -53,7 +53,7 @@ def create_hashtags(media_type: str, genres: list, ai_genres: list = None) -> st
     
     # Limpiamos y creamos hashtags de géneros
     genre_hashtags = []
-    for genre in all_genres[:4]:  # Máximo 4 géneros
+    for genre in all_genres[:3]:  # Máximo 4 géneros
         if genre and isinstance(genre, str):
             clean_genre = genre.replace(' ', '').replace('-', '').replace('&', '').replace('/', '')
             if clean_genre and len(clean_genre) > 2:  # Solo géneros válidos

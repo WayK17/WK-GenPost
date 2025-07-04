@@ -15,6 +15,7 @@ DEFAULT_TEMPLATE = """{hashtags}
 ---
 📜 <b>SINOPSIS:</b>
 <blockquote><a href="{synopsis_url}">Click Aquí</a></blockquote>
+
 ---
 <a href="https://t.me/NESS_Cloud">Nᴇꜱꜱ Cʟᴏᴜᴅ</a>
 """
