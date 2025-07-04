@@ -111,21 +111,36 @@ async def extract_language_details_from_caption(caption: str) -> dict | None:
 
 
 # Por ahora no necesitamos la función de descripción, la añadiremos luego.
-async def generate_creative_description(title: str, overview: str) -> str:
+async def generate_telegraph_analysis(title: str, media_info: dict) -> str:
     """
-    Usa Gemini para generar una descripción creativa y atractiva.
+    Analiza los datos de MediaInfo con Gemini y genera un texto enriquecido para Telegraph.
     """
-    prompt = f"""
-    Basado en el título "{title}" y la siguiente sinopsis: "{overview}",
-    escribe una descripción corta (2-3 frases), atractiva y con emojis para un post de Telegram.
-    El tono debe ser emocionante y captar la atención. No incluyas la sinopsis original.
-    """
-    logger.info(f"Generando descripción creativa para: {title}")
+    if not media_info:
+        return "<p><i>Análisis técnico no disponible (archivo muy grande o error de MediaInfo).</i></p>"
+
+    # Simplificamos los datos para el prompt
     try:
+        video_track = next((t for t in media_info['media']['track'] if t['@type'] == 'Video'), {})
+        audio_tracks = [t for t in media_info['media']['track'] if t['@type'] == 'Audio']
+        
+        prompt = f"""
+        Eres un experto en códecs y formatos de video. Analiza los siguientes datos técnicos para "{title}" y escribe un resumen amigable en formato HTML.
+
+        Datos:
+        - Video: Resolución {video_track.get('Width')}x{video_track.get('Height')}, Formato {video_track.get('Format')}
+        - Audios: Hay {len(audio_tracks)} pistas de audio. Sus idiomas o títulos son: {[t.get('Title') or t.get('Language_String3') for t in audio_tracks]}
+
+        En tu resumen:
+        1. Comenta brevemente la calidad del video.
+        2. Describe los audios disponibles de forma clara.
+        3. Usa párrafos `<p>` y listas `<ul><li>...</li></ul>` para estructurar la información.
+        """
+        
+        logger.info(f"Generando análisis técnico de Telegraph para: {title}")
         response = await model.generate_content_async(prompt)
         return response.text.strip()
     except Exception as e:
-        logger.error(f"Error al generar la descripción con Gemini: {e}")
-        return "Una emocionante película/serie que no te puedes perder." # Respuesta de respaldo
+        logger.error(f"Error generando el análisis para Telegraph: {e}")
+        return "<p>No se pudo generar el análisis técnico.</p>"
 
         

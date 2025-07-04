@@ -1,51 +1,59 @@
 # /bot/templates.py
 
-DEFAULT_TEMPLATE = """
-✨ <b>{title}</b> ({year})
-
-{gemini_description}
+DEFAULT_TEMPLATE = """{hashtags}
 ---
-🎬 <b>Detalles:</b>
-<i>{overview}</i>
-
-- <b>Géneros:</b> {genres}
+🔺 <b>{series_title} - T{season:02d}E{episode:02d}</b>
+<i>{episode_title}</i>
 ---
-⚙️ <b>Info. Técnica:</b>
-- <b>Resolución:</b> <code>{resolution}</code>
-- <b>Audio:</b> <code>{audio_tracks}</code>
-- <b>Subtítulos:</b> <code>{subtitle_tracks}</code>
-- <b>Peso:</b> <code>{file_size}</code>
+🏆 | <b>Calidad:</b> <code>{quality}</code>
+📺 | <b>Resolución:</b> <code>{resolution}</code>
+⏳ | <b>Duración:</b> <code>{runtime}</code>
+⚖️ | <b>Peso:</b> <code>{file_size}</code>
+🔊 | <b>Audio:</b> <code>{audio_tracks}</code>
+💬 | <b>Subtítulos:</b> <code>{subtitle_tracks}</code>
+📁 | <b>Formato:</b> <code>{format}</code>
+---
+📜 <b>SINOPSIS:</b>
+<blockquote><a href="{synopsis_url}">Click Aquí</a></blockquote>
+---
+<a href="https://t.me/NESS_Cloud">Nᴇꜱꜱ Cʟᴏᴜᴅ</a>
 """
 
 
 SEASON_TEMPLATE = """
 {hashtags}
-
 ---
 🔺 <b>{title} T{season:02d}</b>
 ---
-🏆 | <b>Calidad:</b> {quality}
+🏆 | <b>Calidad:</b> <code>{quality}</code>
 📺 | <b>Resolución:</b> <code>{resolution}</code>
 💿 | <b>Episodios:</b> {episodes_count} (Completa)
-⚖️ | <b>Peso Total:</b> ~{file_size}
-🔊 | <b>Audio:</b> {audio_tracks}
-💬 | <b>Subtítulos:</b> {subtitle_tracks}
-📁 | <b>Formato:</b> {format}
+⚖️ | <b>Peso Total:</b> <code>~{file_size}</code>
+🔊 | <b>Audio:</b> <code>{audio_tracks}</code>
+💬 | <b>Subtítulos:</b> <code>{subtitle_tracks}</code>
+📁 | <b>Formato:</b> <code>{format}</code>
 ---
+📜 <b>SINOPSIS:</b>
+<blockquote><a href="{synopsis_url}">Click Aquí</a></blockquote>
+---
+<a href="https://t.me/NESS_Cloud">Nᴇꜱꜱ Cʟᴏᴜᴅ</a>
 """
 
 MOVIE_TEMPLATE = """
 {hashtags}
-
 ---
 🔺 <b>{title} ({year})</b>
 ---
-🏆 | <b>Calidad:</b> {quality}
+🏆 | <b>Calidad:</b> <code>{quality}</code>
 📺 | <b>Resolución:</b> <code>{resolution}</code>
-⏳ | <b>Duración:</b> {runtime}
-⚖️ | <b>Peso:</b> {file_size}
-🔊 | <b>Audio:</b> {audio_tracks}
-💬 | <b>Subtítulos:</b> {subtitle_tracks}
-📁 | <b>Formato:</b> {format}
+⏳ | <b>Duración:</b> <code>{runtime}</code>
+⚖️ | <b>Peso:</b> <code>{file_size}</code>
+🔊 | <b>Audio:</b> <code>{audio_tracks}</code>
+💬 | <b>Subtítulos:</b> <code>{subtitle_tracks}</code>
+📁 | <b>Formato:</b> <code>{format}</code>
 ---
+📜 <b>SINOPSIS:</b>
+<blockquote><a href="{synopsis_url}">Click Aquí</a></blockquote>
+---
+<a href="https://t.me/NESS_Cloud">Nᴇꜱꜱ Cʟᴏᴜᴅ</a>
 """

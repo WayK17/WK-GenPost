@@ -4,3 +4,4 @@ python-dotenv
 pymediainfo
 google-generativeai
 aiohttp
+telegraph
