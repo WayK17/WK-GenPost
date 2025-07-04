@@ -142,146 +142,122 @@ async def process_single_ai_request(filename: str, caption: Optional[str], media
 @Client.on_message(filters.document | filters.video)
 async def file_handler(client: Client, message: Message):
     """
-    Manejador principal MEJORADO con géneros de IA e iconos dinámicos.
+    Manejador principal con flujo de datos optimizado y corregido.
     """
     media = message.video or message.document
-    if not getattr(media, "file_name", None): 
+    if not getattr(media, "file_name", None):
         return
 
     status_message = await message.reply_text("⏳ Misión aceptada. Protocolos iniciados...", quote=True)
 
     try:
-        # --- Fase 1: Recolección de Datos Técnicos ---
-        await status_message.edit_text("⚙️ Obteniendo datos técnicos del archivo...")
+        # --- Fase 1: Recolección de Datos Técnicos y Análisis Inicial ---
+        await status_message.edit_text("⚙️ Analizando metadatos del archivo...")
         
+        # Obtenemos info de MediaInfo y de la IA (solo para el nombre) en paralelo
         media_info_task = asyncio.create_task(mediainfo.get_media_info(client, message))
-        
-        is_season_pack = (message.caption and 
-                         ("temporada" in message.caption.lower() or "season" in message.caption.lower()))
+        initial_ai_details_task = asyncio.create_task(gemini.get_initial_details(media.file_name))
         
         media_info_data = await media_info_task
-        
-        # --- Fase 2: UNA SOLA LLAMADA A LA IA MEJORADA ---
-        await status_message.edit_text("🤖 Consultando a la IA (análisis completo con géneros)...")
-        
-        ai_comprehensive_data = await process_single_ai_request(
-            media.file_name, 
-            message.caption, 
-            media_info_data
-        )
-        
-        if not ai_comprehensive_data or not ai_comprehensive_data.get("details"):
-            await status_message.edit_text("❌ La IA no pudo procesar la información del archivo.")
+        initial_ai_details = await initial_ai_details_task
+
+        if not initial_ai_details:
+            await status_message.edit_text("❌ La IA no pudo analizar el nombre del archivo.")
             return
-        
-        # Extraer TODOS los datos de la respuesta única
-        details = ai_comprehensive_data.get("details", {})
-        lang_details_from_ai = ai_comprehensive_data.get("language_details", {})
-        content_analysis = ai_comprehensive_data.get("content_analysis", {})  # NUEVO
-        gemini_analysis = ai_comprehensive_data.get("telegraph_analysis", "<p>Análisis no disponible.</p>")
-        
-        # --- Fase 3: Búsqueda en TMDb MEJORADA ---
+
+        # --- Fase 2: Búsqueda en TMDb ---
         await status_message.edit_text("🎬 Buscando en la base de datos cinematográfica...")
         
-        media_type = details.get("type")
-        title = details.get("title")
-        year = details.get("year")
-        
-        # Determinar tipo de búsqueda y template
-        if is_season_pack:
-            season = details.get("season")
-            tmdb_data = await tmdb.search_series(title, season, episode_number=None)
-            template_to_use = templates.SEASON_TEMPLATE
-            media_type_for_hashtag = "Serie"
-        elif media_type == "movie":
+        title = initial_ai_details.get("title")
+        year = initial_ai_details.get("year")
+        media_type = initial_ai_details.get("type")
+        season = initial_ai_details.get("season")
+        episode = initial_ai_details.get("episode")
+
+        tmdb_data = None
+        if media_type == "movie":
             tmdb_data = await tmdb.search_movie(title, year)
-            template_to_use = templates.MOVIE_TEMPLATE
-            media_type_for_hashtag = "Película"
-        else:
-            season = details.get("season", 1)
-            episode = details.get("episode")
-            tmdb_data = await tmdb.search_series(title, season, episode_number=episode)
-            template_to_use = templates.DEFAULT_TEMPLATE
-            media_type_for_hashtag = "Serie"
-        
+        elif media_type == "series":
+            tmdb_data = await tmdb.search_series(title, season, episode)
+
         if not tmdb_data:
-            await status_message.edit_text(f"❌ No encontré '{title}' en la base de datos.")
+            await status_message.edit_text(f"❌ No encontré '{title}' en la base de datos de TMDb.")
             return
-        
-        # --- Fase 4: UNA SOLA LLAMADA A LA IA (ahora con datos de TMDb) ---
-        await status_message.edit_text("🤖 Pidiendo a la IA que formatee la información con datos de TMDb...")
+            
+        # --- Fase 3: Llamada a la IA para Formateo ---
+        await status_message.edit_text("🤖 Pidiendo a la IA que formatee la información...")
         ai_comprehensive_data = await process_single_ai_request(
-            media.file_name, 
-            message.caption, 
+            media.file_name,
+            message.caption,
             media_info_data,
-            tmdb_data  # <--- ¡AQUÍ PASAMOS LOS DATOS!
+            tmdb_data  # Pasamos los datos de TMDb para que la IA los formatee
         )
+
+        if not ai_comprehensive_data:
+            await status_message.edit_text("❌ La IA no pudo procesar los datos para el post.")
+            return
+
+        # --- Fase 4: Ensamblaje Final de Datos ---
+        await status_message.edit_text("🔧 Ensamblando publicación final...")
+
+        # Extraer datos de las respuestas
+        details = ai_comprehensive_data.get("details", {})
+        lang_details_from_ai = ai_comprehensive_data.get("language_details", {})
+        content_analysis = ai_comprehensive_data.get("content_analysis", {})
+        gemini_analysis_html = ai_comprehensive_data.get("telegraph_analysis", "<p>Análisis de IA no disponible.</p>")
+
+        # Crear contenido para Telegraph
+        tmdb_title = tmdb_data.get('title') or tmdb_data.get('name')
+        overview = tmdb_data.get('overview', 'Sinopsis no disponible.')
+        telegraph_content = f"<h3>Sinopsis Oficial</h3><p><em>{overview}</em></p><hr>{gemini_analysis_html}"
         
         synopsis_url = await asyncio.to_thread(
-            telegraph.create_page, 
-            f"Detalles de {tmdb_title}", 
+            telegraph.create_page,
+            f"Detalles de {tmdb_title}",
             telegraph_content
         )
-        
-        # --- Fase 5: Ensamblaje de Datos Técnicos ---
-        await status_message.edit_text("🔧 Ensamblando información técnica...")
-        
+
+        # Preparar datos para la plantilla del post
         base_audios, base_subs, resolution = extract_media_tracks(media_info_data)
-        final_audios = merge_language_tracks(base_audios, lang_details_from_ai.get("audio", []))
-        final_subs = merge_language_tracks(base_subs, lang_details_from_ai.get("subtitles", []))
-        
-        # --- Fase 6: Preparación MEJORADA con géneros e iconos ---
+        media_type_for_hashtag = "Película" if media_type == "movie" else "Serie"
         tmdb_genres_list = [genre['name'] for genre in tmdb_data.get('genres', [])]
         ai_genres_list = content_analysis.get("probable_genres", [])
-        content_type = content_analysis.get("content_type", "live_action")
-        
-        release_date = (tmdb_data.get('release_date') or 
-                       tmdb_data.get('air_date') or 
-                       tmdb_data.get('first_air_date', 'N/A'))
-        
+
         post_data = {
             "title": tmdb_title,
-            "year": release_date.split('-')[0] if release_date != 'N/A' else 'N/A',
+            "year": (tmdb_data.get('release_date') or tmdb_data.get('first_air_date', 'N/A')).split('-')[0],
             "hashtags": create_hashtags(media_type_for_hashtag, tmdb_genres_list, ai_genres_list),
             "synopsis_url": synopsis_url or TELEGRAPH_FALLBACK_URL,
             "runtime": format_runtime(tmdb_data.get('runtime')),
             "quality": "WEB-DL",
             "file_size": format_file_size(media.file_size),
             "format": get_file_format(media.file_name),
-            "season": details.get("season"),
-            "episode": details.get("episode"),
-            "episodes_count": (len(tmdb_data.get('episodes', [])) if is_season_pack 
-                             else tmdb_data.get('episode_number')),
+            "season": season,
+            "episode": episode,
             "resolution": resolution,
-            "audio_tracks": final_audios,  # CORREGIDO
-            "subtitle_tracks": final_subs,  # CORREGIDO
-            "series_title": title,
-            "episode_title": tmdb_title if media_type == 'series' else ''
+            "audio_tracks": merge_language_tracks(base_audios, lang_details_from_ai.get("audio", [])),
+            "subtitle_tracks": merge_language_tracks(base_subs, lang_details_from_ai.get("subtitles", []))
         }
-        
-        # --- Fase 7: Publicación Final ---
+
+        # --- Fase 5: Publicación Final ---
         await status_message.edit_text("🚀 Publicando contenido...")
         
+        is_season_pack = (message.caption and ("temporada" in message.caption.lower() or "season" in message.caption.lower()))
+        template_to_use = templates.SEASON_TEMPLATE if is_season_pack else (templates.MOVIE_TEMPLATE if media_type == "movie" else templates.DEFAULT_TEMPLATE)
         final_caption = template_to_use.format(**post_data)
-        poster_path = tmdb_data.get('poster_path') or tmdb_data.get('still_path')
+
+        poster_path = tmdb_data.get('poster_path')
         poster_url = f"{TMDB_IMAGE_BASE_URL}{poster_path}" if poster_path else None
-        
+
         await status_message.delete()
-        
         if poster_url:
-            await client.send_photo(
-                message.chat.id, 
-                photo=poster_url, 
-                caption=final_caption, 
-                parse_mode=ParseMode.HTML
-            )
+            await client.send_photo(message.chat.id, photo=poster_url, caption=final_caption, parse_mode=ParseMode.HTML)
         else:
-            await message.reply_text(
-                final_caption, 
-                quote=True, 
-                parse_mode=ParseMode.HTML
-            )
-    
+            await message.reply_text(final_caption, quote=True, parse_mode=ParseMode.HTML)
+
     except Exception as e:
         logger.error(f"Error catastrófico en file_handler: {e}", exc_info=True)
-        await status_message.edit_text(f"❌ Ocurrió un error inesperado.\n`{e}`")
+        await status_message.edit_text(f"💥 ¡Uy! Hubo un error inesperado:\n`{e}`")
+    finally:
+        # Limpieza (si es necesario)
+        pass
