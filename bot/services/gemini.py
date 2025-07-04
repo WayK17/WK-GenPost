@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 genai.configure(api_key=config.GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-async def get_all_ai_details(filename: str, caption: str | None, media_info: dict | None) -> dict | None:
+async def get_comprehensive_analysis(filename: str, caption: str | None, media_info: dict | None) -> dict | None:
     """
     Función maestra que obtiene TODOS los detalles de la IA en una sola llamada.
     """
