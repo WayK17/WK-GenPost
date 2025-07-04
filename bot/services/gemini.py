@@ -12,6 +12,7 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 async def get_comprehensive_analysis(filename: str, caption: str | None, media_info: dict | None) -> dict | None:
     """
     Función maestra que obtiene TODOS los detalles de la IA en una sola llamada.
+    MEJORADA: Ahora incluye análisis de géneros e iconos dinámicos.
     """
     # Preparamos un resumen de MediaInfo para el prompt
     tech_summary = "No disponible."
@@ -41,21 +42,35 @@ async def get_comprehensive_analysis(filename: str, caption: str | None, media_i
         "audio": ["Idioma1", "Idioma2"],
         "subtitles": ["IdiomaSub1", "IdiomaSub2 (Forzados)"]
       }},
+      "content_analysis": {{
+        "probable_genres": ["Acción", "Drama", "Comedia", "Thriller", "Ciencia Ficción", "Terror", "Romance", "Fantasía"],
+        "content_type": "live_action" | "anime" | "documentary" | "animation",
+        "age_rating": "general" | "teen" | "adult"
+      }},
       "telegraph_analysis": "Un análisis técnico amigable y atractivo en formato HTML sobre la calidad, basado en el resumen técnico."
     }}
     
     Instrucciones Clave:
-    1. Para "details", analiza el Filename.
+    1. Para "details", analiza el Filename para extraer título, año, temporada y episodio.
     2. Para "language_details", la información en el Caption tiene la MÁXIMA prioridad. Si no hay, déjalo vacío.
-    3. Para "telegraph_analysis", usa el Resumen Técnico para escribir un párrafo HTML.
+    3. Para "content_analysis", analiza el filename y caption para determinar:
+       - probable_genres: Lista de géneros probables basados en el título y contexto
+       - content_type: Si es live_action, anime, documental o animación
+       - age_rating: Clasificación general de audiencia
+    4. Para "telegraph_analysis", usa el Resumen Técnico para escribir un párrafo HTML atractivo.
+    
+    Ejemplos de análisis:
+    - "Dragon Ball Super" → content_type: "anime", probable_genres: ["Acción", "Aventura", "Shonen"]
+    - "The Walking Dead" → content_type: "live_action", probable_genres: ["Terror", "Drama", "Thriller"]
+    - "Pixar Cars" → content_type: "animation", probable_genres: ["Familia", "Aventura", "Comedia"]
     """
     
-    logger.info(f"Enviando petición maestra a Gemini para: {filename}")
+    logger.info(f"Enviando petición maestra MEJORADA a Gemini para: {filename}")
     try:
         response = await model.generate_content_async(prompt)
         cleaned_response = response.text.strip().replace("```json", "").replace("```", "").strip()
         data = json.loads(cleaned_response)
-        logger.info(f"Gemini devolvió todos los detalles en una sola llamada.")
+        logger.info(f"Gemini devolvió análisis completo incluyendo géneros e iconos.")
         return data
     except Exception as e:
         logger.error(f"Error en la llamada maestra a Gemini: {e}", exc_info=True)
