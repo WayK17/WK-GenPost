@@ -4,6 +4,7 @@ import httpx
 import logging
 from difflib import SequenceMatcher
 from .. import config
+from ..modules.post_creator import clean_title_for_matching
 
 logger = logging.getLogger(__name__)
 
@@ -13,29 +14,36 @@ BASE_URL = "https://api.themoviedb.org/3"
 
 def find_best_match(query: str, results: list) -> dict | None:
     """
-    Usa un comparador de strings para encontrar el mejor resultado en una lista.
-    Esto mejora drásticamente la precisión de la búsqueda.
+    Usa un comparador de strings MEJORADO con títulos limpios.
     """
     if not results:
         return None
 
     best_match = None
     highest_ratio = 0.0
+    
+    # Limpiamos el título original de la búsqueda UNA SOLA VEZ
+    clean_query = clean_title_for_matching(query)
 
-    # Itera sobre los resultados para encontrar el que más se parece al título original
     for result in results:
         title_key = 'title' if 'title' in result else 'name'
-        if result.get(title_key):
-            ratio = SequenceMatcher(None, query.lower(), result[title_key].lower()).ratio()
+        result_title = result.get(title_key)
+        
+        if result_title:
+            # Limpiamos el título del resultado de TMDb antes de comparar
+            clean_result_title = clean_title_for_matching(result_title)
+            
+            ratio = SequenceMatcher(None, clean_query, clean_result_title).ratio()
+            
             if ratio > highest_ratio:
                 highest_ratio = ratio
                 best_match = result
     
-    # Solo acepta el resultado si la similitud es razonable (evita falsos positivos)
-    if highest_ratio > 0.7: # Umbral de confianza del 60%
+    # Relajamos el umbral porque los títulos limpios son más fáciles de emparejar
+    if highest_ratio > 0.8: # Umbral de confianza del 80% para títulos limpios
         return best_match
     
-    logger.warning(f"No se encontró un resultado suficientemente bueno para '{query}'. El mejor tuvo un ratio de {highest_ratio:.2f}.")
+    logger.warning(f"No se encontró un resultado suficientemente bueno para '{query}'. El mejor tuvo un ratio de {highest_ratio:.2f} con títulos limpios.")
     return None
 
 async def fetch_from_tmdb(url: str, params: dict) -> dict | None:

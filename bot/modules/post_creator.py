@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pyrogram.enums import ParseMode
+import re
 
 from bot.services import gemini, tmdb, mediainfo, telegraph
 from bot import templates
@@ -24,12 +25,51 @@ LANG_MAP = {
     "portugues": "por", "português": "por", "portuguese": "por", "por": "por"
 }
 
+QUALITY_TAGS = {
+    "WEB-DL": ["web-dl", "webdl"],
+    "WEBRip": ["web-rip", "webrip"],
+    "BDRip": ["bdrip", "bluray", "bd-rip"],
+    "HDRip": ["hdrip"],
+    "HDTV": ["hdtv"],
+    "DVDRip": ["dvdrip"],
+    "CAM": ["cam", "camrip"],
+    "TS": ["ts", "telesync"]
+}
+
 TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"
 TELEGRAPH_FALLBACK_URL = "https://telegra.ph/"
 
 # --- Funciones de Utilidad ---
 def get_file_format(filename: str) -> str:
     return filename.split('.')[-1].upper() if '.' in filename else 'N/A'
+
+def parse_quality(text: str) -> Optional[str]:
+    """
+    NUEVA FUNCIÓN: Analiza un texto (filename o caption) para encontrar
+    una etiqueta de calidad conocida.
+    """
+    if not text:
+        return None
+    # Preparamos el texto para una búsqueda más fácil (minúsculas, sin puntos)
+    lower_text = text.lower().replace('.', ' ').replace('-', ' ')
+    for quality, tags in QUALITY_TAGS.items():
+        for tag in tags:
+            if tag in lower_text:
+                return quality
+    return None # No se encontró ninguna etiqueta conocida
+
+def clean_title_for_matching(title: str) -> str:
+    """Limpia un título para una comparación robusta."""
+    if not title:
+        return ""
+    # Convertir a minúsculas
+    title = title.lower()
+    # Quitar caracteres especiales y signos de puntuación
+    title = re.sub(r'[^\w\s]', '', title)
+    # Quitar espacios extra
+    title = re.sub(r'\s+', '', title)
+    return title
+
 
 def create_hashtags(media_type: str, genres: list, ai_genres: list = None) -> str:
     """
@@ -243,6 +283,22 @@ async def file_handler(client: Client, message: Message):
 
         # Contamos los episodios si es una temporada y nos aseguramos de tener todas las llaves.
         episodes_count = len(tmdb_data.get('episodes', [])) if media_type == 'series' else 0 
+
+        # --- LÓGICA DE DETECCIÓN DE CALIDAD ---
+        detected_quality = "N/A"
+        if message.caption:
+            quality_from_caption = parse_quality(message.caption)
+            if quality_from_caption:
+                detected_quality = quality_from_caption
+
+        if detected_quality == "N/A": # Si no se encontró en el caption
+            quality_from_filename = parse_quality(media.file_name)
+            if quality_from_filename:
+                detected_quality = quality_from_filename
+        
+        # Si después de todo no se encontró, ponemos un default
+        if detected_quality == "N/A":
+            detected_quality = "WEB-DL"
         
         post_data = {
             "title": tmdb_title,
@@ -250,7 +306,7 @@ async def file_handler(client: Client, message: Message):
             "hashtags": create_hashtags(media_type_for_hashtag, tmdb_genres_list, ai_genres_list),
             "synopsis_url": synopsis_url or TELEGRAPH_FALLBACK_URL,
             "runtime": format_runtime(tmdb_data.get('runtime')),
-            "quality": "WEB-DL",
+            "quality": detected_quality,
             "file_size": format_file_size(media.file_size),
             "format": get_file_format(media.file_name),
             "resolution": resolution,
