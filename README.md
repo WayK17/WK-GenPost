@@ -1,7 +1,7 @@
 # ✨ WK-GenPost Bot ✨
 
 <div align="center">
-  <img src="https://i.imgur.com/v8i2XwF.png" alt="Project Banner" width="600"/>
+  <img src="https://iili.io/3Q8HbFs.jpg" alt="Project Banner" width="600"/>
 </div>
 
 <p align="center">
@@ -23,7 +23,7 @@
 El objetivo es simple: **automatizar lo tedioso para que puedas centrarte en compartir contenido de calidad.**
 
 <div align="center">
-  <img src="https://i.imgur.com/A6sE2a9.gif" alt="Demo del Bot en Acción" width="400"/>
+  <img src="https://iili.io/3Q8HbFs.jpg" alt="Demo del Bot en Acción" width="400"/>
   <br>
   <em>Un vistazo al resultado final. Limpio, profesional y automático.</em>
 </div>
