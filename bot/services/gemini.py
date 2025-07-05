@@ -47,6 +47,12 @@ async def get_comprehensive_analysis(filename: str, caption: str | None, media_i
     }}
 
     Instrucciones Adicionales:
+    1.  **details**:
+        * **title**: Extrae el título principal del archivo. Sé preciso.
+        * **year**: Busca un año de 4 dígitos entre paréntesis, como (2025) o (1994). Si no lo encuentras, usa `null`. ES MUY IMPORTANTE QUE EXTRAIGAS EL AÑO SI EXISTE.
+        * **season/episode**: Analiza patrones como "S01E01", "- 01 -", o similares para identificar series. Si no hay, son `null`.
+
+    Instrucciones Adicionales:
     1.  **details**: Analiza el nombre del archivo para extraer el título, año, temporada y episodio. Si un campo no aplica, usa `null`.
     2.  **language_details**: La información en el `Caption` tiene la MÁXIMA prioridad. Si no hay `Caption`, infiere los idiomas del nombre del archivo. Si no es posible, déjalo como un array vacío `[]`.
     3.  **content_analysis**: Basándote en el título y el `Caption`, determina los géneros más probables.
