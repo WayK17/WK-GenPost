@@ -171,6 +171,7 @@ async def file_handler(client: Client, message: Message):
     """
     Manejador principal con el flujo de datos ORIGINAL y corregido.
     """
+    media_info_data = None
     media = message.video or message.document
     if not getattr(media, "file_name", None):
         return
@@ -195,6 +196,7 @@ async def file_handler(client: Client, message: Message):
 
         # --- Fase 2: LLAMADA ÚNICA A LA IA ---
         await status_message.edit_text("🤖 Consultando a la IA (petición única)...")
+        await asyncio.sleep(5)
         ai_comprehensive_data = await gemini.get_comprehensive_analysis(
             media.file_name,
             message.caption,
