@@ -4,7 +4,7 @@ import httpx
 import logging
 from difflib import SequenceMatcher
 from .. import config
-from ..modules.post_creator import clean_title_for_matching
+from .. import utils
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def find_best_match(query: str, results: list) -> dict | None:
     highest_ratio = 0.0
     
     # Limpiamos el título original de la búsqueda UNA SOLA VEZ
-    clean_query = clean_title_for_matching(query)
+    clean_query = utils.clean_title_for_matching(query)
 
     for result in results:
         title_key = 'title' if 'title' in result else 'name'
